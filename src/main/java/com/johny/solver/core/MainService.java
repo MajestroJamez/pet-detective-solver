@@ -6,6 +6,7 @@ import javafx.concurrent.Task;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedList;
+import java.util.stream.Collectors;
 
 public class MainService extends Service<String> {
     private static final String PICK = "P";
@@ -13,9 +14,10 @@ public class MainService extends Service<String> {
 
 
     private final DirectionNode[][] directionMap;
-    private final LinkedList<SolvingState> buffer = new LinkedList<>();
+    private LinkedList<SolvingState> buffer = new LinkedList<>();
     private final Integer dfsAfter;
     private boolean alreadySorted = false;
+    private Integer numberOfActionNodes;
 
     public MainService(String[][] nodeMap, DirectionNode[][] directionMap, Integer maxMoves, Integer dfsAfter) {
         this.directionMap = directionMap;
@@ -27,6 +29,7 @@ public class MainService extends Service<String> {
         begin.setNodeMap(nodeMap);
         this.dfsAfter = dfsAfter;
         addToBuffer(begin);
+        numberOfActionNodes = getNumberOfActionNodes(nodeMap);
     }
 
     private void findAndSetStartingPoint(String[][] nodeMap, SolvingState begin) {
@@ -40,6 +43,19 @@ public class MainService extends Service<String> {
         }
     }
 
+    private Integer getNumberOfActionNodes(String[][] nodeMap) {
+        Integer numberOfActionNodes = 0;
+        for (int i = 0; i < nodeMap.length; i++) {
+            for (int j = 0; j < nodeMap[0].length; j++) {
+                if (nodeMap[i][j] != null && !"".equals(nodeMap[i][j])) {
+                    numberOfActionNodes++;
+                }
+            }
+        }
+        // S point already removed
+        return numberOfActionNodes;
+    }
+
     @Override
     protected Task<String> createTask() {
         return new Task<>() {
@@ -47,8 +63,13 @@ public class MainService extends Service<String> {
             protected String call() {
                 int count = 0;
                 int bufferMaxSize = 0;
+                int depth = 1;
                 while (!buffer.isEmpty()) {
                     SolvingState currentState = buffer.pop();
+                    if (currentState.getMovesDone()>= depth){
+                        evaluate(depth, currentState.getRemainingMoves());
+                        depth++;
+                    }
                     if (currentState.isEnd()) {
                         currentState.setSolution(String.format("%s ,\n %s", currentState.getSolution(), currentState.getRemainingMoves()));
                         return currentState.getSolution();
@@ -80,6 +101,15 @@ public class MainService extends Service<String> {
                 throw new RuntimeException("this has no solution");
             }
         };
+    }
+
+    private void evaluate(Integer depth, Integer remainigMoves) {
+        Integer minimumScore = numberOfActionNodes - remainigMoves;
+        if (minimumScore <0){
+            minimumScore = 0;
+        }
+        final Integer finalMinimumScore = minimumScore;
+        buffer = buffer.stream().filter(item -> item.getScore() >= finalMinimumScore).collect(Collectors.toCollection(LinkedList::new));
     }
 
 
@@ -132,17 +162,17 @@ public class MainService extends Service<String> {
     }
 
     private void addToBuffer(SolvingState newState) {
-        if (newState.getMovesDone() > dfsAfter) {
-            //DFS
-            buffer.push(newState);
-            //just one sorting before DFS will run
-            if (!alreadySorted) {
-                buffer.sort(Comparator.comparing(SolvingState::getScore).reversed());
-                alreadySorted = true;
-            }
-        } else {
+//        if (newState.getMovesDone() > dfsAfter) {
+//            //DFS
+//            buffer.push(newState);
+//            //just one sorting before DFS will run
+//            if (!alreadySorted) {
+//                buffer.sort(Comparator.comparing(SolvingState::getScore).reversed());
+//                alreadySorted = true;
+//           }
+//        } else {
             //BFS
             buffer.offer(newState);
-        }
+//        }
     }
 }
