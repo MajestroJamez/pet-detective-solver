@@ -5,8 +5,8 @@ import javafx.concurrent.Task;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.LinkedList;
-import java.util.stream.Collectors;
 
 public class MainService extends Service<String> {
     private static final String PICK = "P";
@@ -61,17 +61,18 @@ public class MainService extends Service<String> {
         return new Task<>() {
             @Override
             protected String call() {
+                System.out.println(new Date() + " Start");
                 int count = 0;
                 int bufferMaxSize = 0;
-                int depth = 1;
                 while (!buffer.isEmpty()) {
                     SolvingState currentState = buffer.pop();
-                    if (currentState.getMovesDone()>= depth){
-                        evaluate(depth, currentState.getRemainingMoves());
-                        depth++;
-                    }
+                       if (currentState.getScore() < numberOfActionNodes - currentState.getRemainingMoves()) {
+                           continue;
+                       }
+
                     if (currentState.isEnd()) {
-                        currentState.setSolution(String.format("%s ,\n %s", currentState.getSolution(), currentState.getRemainingMoves()));
+                        System.out.println(new Date() + " End with result");
+                        currentState.setSolution(String.format(new Date() + "\n %s ,\n %s", currentState.getSolution(), currentState.getRemainingMoves()));
                         return currentState.getSolution();
                     }
                     if (currentState.getRemainingMoves() != 0) {
@@ -95,23 +96,14 @@ public class MainService extends Service<String> {
                     updateMessage("Buffer actual size: " + buffer.size() +
                             ", count: " + count++ +
                             ", actual remaining moves: " + currentState.getRemainingMoves() +
+                            ", actual moves done: " + currentState.getMovesDone() +
                             ", Buffer max size: " + bufferMaxSize);
                 }
-
+                System.out.println(new Date() + " End");
                 throw new RuntimeException("this has no solution");
             }
         };
     }
-
-    private void evaluate(Integer depth, Integer remainigMoves) {
-        Integer minimumScore = numberOfActionNodes - remainigMoves;
-        if (minimumScore <0){
-            minimumScore = 0;
-        }
-        final Integer finalMinimumScore = minimumScore;
-        buffer = buffer.stream().filter(item -> item.getScore() >= finalMinimumScore).collect(Collectors.toCollection(LinkedList::new));
-    }
-
 
     private void processNode(Integer posX, Integer posY, SolvingState previousState) {
         String actualStateNodeString = previousState.getNodeMap()[posX][posY];
@@ -130,7 +122,9 @@ public class MainService extends Service<String> {
             } else {
                 addNoActionState(posX, posY, previousState);
             }
-        } else throw new RuntimeException("Unexpected state");
+        } else {
+            throw new RuntimeException("Unexpected state, problem with field: " + actualStateNodeString);
+        }
     }
 
     private void addNoActionState(Integer posX, Integer posY, SolvingState previousState) {
@@ -162,17 +156,17 @@ public class MainService extends Service<String> {
     }
 
     private void addToBuffer(SolvingState newState) {
-//        if (newState.getMovesDone() > dfsAfter) {
-//            //DFS
-//            buffer.push(newState);
-//            //just one sorting before DFS will run
-//            if (!alreadySorted) {
-//                buffer.sort(Comparator.comparing(SolvingState::getScore).reversed());
-//                alreadySorted = true;
-//           }
-//        } else {
+        if (newState.getMovesDone() > dfsAfter) {
+            //DFS
+            buffer.push(newState);
+            //just one sorting before DFS will run
+            if (!alreadySorted) {
+                buffer.sort(Comparator.comparing(SolvingState::getScore).reversed());
+                alreadySorted = true;
+           }
+        } else {
             //BFS
             buffer.offer(newState);
-//        }
+        }
     }
 }
